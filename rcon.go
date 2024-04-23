@@ -1,27 +1,51 @@
 package main
 
 import (
-	"fmt"
 	"github.com/gorcon/rcon"
 	"log"
-	"net/http"
+	"os"
 )
 
-// TODO: Make it universal function
-func getDifficulty(w http.ResponseWriter, r *http.Request) {
+var RCON_HOST = os.Getenv("RCON_HOST")
+var RCON_PORT = os.Getenv("RCON_PORT")
+var RCON_PASS = os.Getenv("RCON_PASS")
 
-	conn, err := rcon.Dial("testserver-mc-1:25575", "1234123")
+func sendRCONCommand(cmd string) (string, error) {
+	conn, err := rcon.Dial(RCON_HOST+":"+RCON_PORT, RCON_PASS)
 	if err != nil {
 		log.Print(err)
 	}
-
 	defer conn.Close()
-
-	response, err := conn.Execute("time set day")
+	response, err := conn.Execute(cmd)
 	if err != nil {
 		log.Print(err)
 	}
+	return response, nil
+}
 
-	fmt.Fprint(w, response)
+func stopServerRCON() (string, error) {
+	response, err := sendRCONCommand("stop")
+	if err != nil {
+		log.Print("Error stopping the server: ", err)
+		return "", err
+	}
+	return response, nil
+}
 
+func getDifficultyRCON() (string, error) {
+	response, err := sendRCONCommand("difficulty")
+	if err != nil {
+		log.Print("Error while getting the difficulty: ", err)
+		return "", err
+	}
+	return response, err
+}
+
+func changeDifficultyRCON(difficulty string) (string, error) {
+	response, err := sendRCONCommand("difficulty " + difficulty)
+	if err != nil {
+		log.Print("Error changing the difficulty: ", err)
+		return "", err
+	}
+	return response, nil
 }

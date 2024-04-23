@@ -9,11 +9,16 @@
 # https://github.com/docker/awesome-compose
 services:
   server:
+    image: morozoffnor/mcapigolang:latest
     build:
       context: .
       target: final
     ports:
       - 8090:8090
+    environment:
+      RCON_HOST: "testserver-mc-1"
+      RCON_PORT: "25575"
+      RCON_PASS: "12345"
     volumes:
       - [PATH TO MINECRAFT SERVER FOLDER]:/srv/data
 

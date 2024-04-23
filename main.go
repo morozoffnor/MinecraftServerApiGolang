@@ -219,10 +219,36 @@ func deleteMod(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 }
-func main() {
-	fmt.Println("test")
 
-	http.HandleFunc("/time", getDifficulty)
+func getDifficulty(w http.ResponseWriter, r *http.Request) {
+	response, err := getDifficultyRCON()
+	if err != nil {
+		log.Print("Error getting difficulty:", err)
+		http.Error(w, "Error getting difficulty", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(wrapRconResponse(response))
+	if err != nil {
+		log.Print("Error encoding to JSON:", err)
+		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
+		return
+	}
+}
+
+func wrapRconResponse(a string) map[string]string {
+	var wa = make(map[string]string)
+	wa["answer"] = a
+	return wa
+}
+
+func main() {
+	fmt.Println("Running server with env:")
+
+	fmt.Printf("RCON_HOST: %s\nRCON_PORT: %s\nRCON_PASS: %s\n", RCON_HOST, RCON_PORT, RCON_PASS)
+
+	http.HandleFunc("GET /rcon/difficulty", getDifficulty)
 	http.HandleFunc("/properties", handleProperties)
 	http.HandleFunc("/mods", handleMods)
 
