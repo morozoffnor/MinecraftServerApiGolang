@@ -220,6 +220,12 @@ func deleteMod(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func wrapRconResponse(a string) map[string]string {
+	var wa = make(map[string]string)
+	wa["answer"] = a
+	return wa
+}
+
 func getDifficulty(w http.ResponseWriter, r *http.Request) {
 	response, err := getDifficultyRCON()
 	if err != nil {
@@ -237,22 +243,80 @@ func getDifficulty(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func wrapRconResponse(a string) map[string]string {
-	var wa = make(map[string]string)
-	wa["answer"] = a
-	return wa
+func changeDifficulty(w http.ResponseWriter, r *http.Request) {
+	type cmd struct {
+		Text string `json:"text"`
+	}
+	var c cmd
+	err := json.NewDecoder(r.Body).Decode(&c)
+	if err != nil {
+		log.Print("Error decoding JSON:", err)
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
+		return
+	}
+	response, err := changeDifficultyRCON(c.Text)
+	if err != nil {
+		log.Print("Error changing difficulty:", err)
+		http.Error(w, "Error changing difficulty", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(wrapRconResponse(response))
+	if err != nil {
+		log.Print("Error encoding to JSON:", err)
+		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
+		return
+	}
+}
+
+func changeGamerule(w http.ResponseWriter, r *http.Request) {
+	type gamerule struct {
+		Rule  string
+		Value string
+	}
+	var gr gamerule
+	err := json.NewDecoder(r.Body).Decode(&gr)
+	if err != nil {
+		log.Print("Error decoding JSON:", err)
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
+		return
+	}
+	response, err := changeGameruleRCON(gr.Rule, gr.Value)
+	if err != nil {
+		log.Print("Error changing gamerule:", err)
+		http.Error(w, "Error changing gamerule", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(wrapRconResponse(response))
+	if err != nil {
+		log.Print("Error encoding to JSON:", err)
+		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
+		return
+	}
+
+}
+
+func authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Print("Auth middleware logic")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func main() {
+	mux := http.NewServeMux()
 	fmt.Println("Running server with env:")
 
 	fmt.Printf("RCON_HOST: %s\nRCON_PORT: %s\nRCON_PASS: %s\n", RCON_HOST, RCON_PORT, RCON_PASS)
 
-	http.HandleFunc("GET /rcon/difficulty", getDifficulty)
+	mux.Handle("GET /rcon/difficulty", authMiddleware(http.HandlerFunc(getDifficulty)))
+	http.HandleFunc("POST /rcon/difficulty", changeDifficulty)
+	http.HandleFunc("POST /rcon/gamerule", changeGamerule)
 	http.HandleFunc("/properties", handleProperties)
 	http.HandleFunc("/mods", handleMods)
 
-	err := http.ListenAndServe(":8090", nil)
+	err := http.ListenAndServe(":8090", mux)
 	if errors.Is(err, http.ErrServerClosed) {
 		log.Print("server closed\n")
 	} else if err != nil {

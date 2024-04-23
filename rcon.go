@@ -49,3 +49,12 @@ func changeDifficultyRCON(difficulty string) (string, error) {
 	}
 	return response, nil
 }
+
+func changeGameruleRCON(rule, value string) (string, error) {
+	response, err := sendRCONCommand("gamerule " + rule + " " + value)
+	if err != nil {
+		log.Print("Error changing gamerule: ", err)
+		return "", err
+	}
+	return response, nil
+}
