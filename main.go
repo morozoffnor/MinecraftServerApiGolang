@@ -311,10 +311,10 @@ func main() {
 	fmt.Printf("RCON_HOST: %s\nRCON_PORT: %s\nRCON_PASS: %s\n", RCON_HOST, RCON_PORT, RCON_PASS)
 
 	mux.Handle("GET /rcon/difficulty", authMiddleware(http.HandlerFunc(getDifficulty)))
-	http.HandleFunc("POST /rcon/difficulty", changeDifficulty)
-	http.HandleFunc("POST /rcon/gamerule", changeGamerule)
-	http.HandleFunc("/properties", handleProperties)
-	http.HandleFunc("/mods", handleMods)
+	mux.Handle("POST /rcon/difficulty", authMiddleware(http.HandlerFunc(changeDifficulty)))
+	mux.Handle("POST /rcon/gamerule", authMiddleware(http.HandlerFunc(changeGamerule)))
+	mux.Handle("/properties", authMiddleware(http.HandlerFunc(handleProperties)))
+	mux.Handle("/mods", authMiddleware(http.HandlerFunc(handleMods)))
 
 	err := http.ListenAndServe(":8090", mux)
 	if errors.Is(err, http.ErrServerClosed) {
