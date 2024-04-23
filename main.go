@@ -9,13 +9,19 @@ import (
 	"os"
 )
 
-var BasePath = "data"
+var BasePath = "/srv/data"
 
-func hello(w http.ResponseWriter, req *http.Request) {
-	_, err := fmt.Fprintf(w, "hi!")
+func getPropertiesMap() (map[string]string, error) {
+	props, err := ReadProperties(BasePath + "/server.properties")
 	if err != nil {
-		return
+		fmt.Println("Error reading properties file:", err)
+		return make(map[string]string), err
 	}
+	allProps := make(map[string]string)
+	for key, value := range props {
+		allProps[key] = value
+	}
+	return allProps, nil
 }
 
 func handleProperties(w http.ResponseWriter, req *http.Request) {
@@ -28,17 +34,13 @@ func handleProperties(w http.ResponseWriter, req *http.Request) {
 }
 
 func getProps(w http.ResponseWriter, req *http.Request) {
-	props, err := ReadProperties(BasePath + "/server.properties")
+	props, err := getPropertiesMap()
 	if err != nil {
 		fmt.Println("Error reading properties file:", err)
 		return
 	}
-	allProps := make(map[string]string)
-	for key, value := range props {
-		allProps[key] = value
-	}
 	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(allProps)
+	err = json.NewEncoder(w).Encode(props)
 	if err != nil {
 		fmt.Println("Error encoding properties to JSON:", err)
 		http.Error(w, "Error encoding properties to JSON", http.StatusInternalServerError)
@@ -47,7 +49,6 @@ func getProps(w http.ResponseWriter, req *http.Request) {
 
 }
 
-// TODO: Return modified properties as JSON
 func modifyProps(w http.ResponseWriter, req *http.Request) {
 	type prop struct {
 		Key   string `json:"key"`
@@ -77,8 +78,16 @@ func modifyProps(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	_, err = fmt.Fprint(w, "success")
+	newProps, err := getPropertiesMap()
 	if err != nil {
+		fmt.Println("Error reading properties file:", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(newProps)
+	if err != nil {
+		fmt.Println("Error encoding properties to JSON:", err)
+		http.Error(w, "Error encoding properties to JSON", http.StatusInternalServerError)
 		return
 	}
 }
@@ -210,7 +219,6 @@ func deleteMod(w http.ResponseWriter, req *http.Request) {
 func main() {
 	fmt.Println("test")
 
-	http.HandleFunc("/hello", hello)
 	http.HandleFunc("/properties", handleProperties)
 	http.HandleFunc("/mods", handleMods)
 
