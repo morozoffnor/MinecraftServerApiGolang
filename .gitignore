@@ -2,3 +2,4 @@ MinecraftServerApiGolang
 bin
 data
 .idea
+compose.yaml

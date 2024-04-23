@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 )
@@ -14,7 +15,7 @@ var BasePath = "/srv/data"
 func getPropertiesMap() (map[string]string, error) {
 	props, err := ReadProperties(BasePath + "/server.properties")
 	if err != nil {
-		fmt.Println("Error reading properties file:", err)
+		log.Print("Error reading properties file:", err)
 		return make(map[string]string), err
 	}
 	allProps := make(map[string]string)
@@ -36,13 +37,14 @@ func handleProperties(w http.ResponseWriter, req *http.Request) {
 func getProps(w http.ResponseWriter, req *http.Request) {
 	props, err := getPropertiesMap()
 	if err != nil {
-		fmt.Println("Error reading properties file:", err)
+		log.Print("Error reading properties file:", err)
+		http.Error(w, "Error reading properties file", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(props)
 	if err != nil {
-		fmt.Println("Error encoding properties to JSON:", err)
+		log.Print("Error encoding properties to JSON:", err)
 		http.Error(w, "Error encoding properties to JSON", http.StatusInternalServerError)
 		return
 	}
@@ -58,14 +60,14 @@ func modifyProps(w http.ResponseWriter, req *http.Request) {
 	var p prop
 	err := json.NewDecoder(req.Body).Decode(&p)
 	if err != nil {
-		fmt.Println("Error decoding JSON:", err)
+		log.Print("Error decoding JSON:", err)
 		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
 		return
 	}
 
 	props, err := ReadProperties(BasePath + "/server.properties")
 	if err != nil {
-		fmt.Println("Error reading properties file:", err)
+		log.Print("Error reading properties file:", err)
 		http.Error(w, "Error reading properties file", http.StatusInternalServerError)
 		return
 	}
@@ -73,20 +75,21 @@ func modifyProps(w http.ResponseWriter, req *http.Request) {
 	props[p.Key] = p.Value
 	err = OverwriteProperties(BasePath+"/server.properties", props)
 	if err != nil {
-		fmt.Println("Error writing properties file:", err)
+		log.Print("Error writing properties file:", err)
 		http.Error(w, "Error writing properties file", http.StatusInternalServerError)
 		return
 	}
 
 	newProps, err := getPropertiesMap()
 	if err != nil {
-		fmt.Println("Error reading properties file:", err)
+		log.Print("Error reading properties file:", err)
+		http.Error(w, "Error reading properties file", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(newProps)
 	if err != nil {
-		fmt.Println("Error encoding properties to JSON:", err)
+		log.Print("Error encoding properties to JSON:", err)
 		http.Error(w, "Error encoding properties to JSON", http.StatusInternalServerError)
 		return
 	}
@@ -123,13 +126,13 @@ func getMods(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	mods, err := getModFilenames()
 	if err != nil {
-		fmt.Println("Error getting list of mods:", err)
+		log.Print("Error getting list of mods:", err)
 		http.Error(w, "Error getting list of mods", http.StatusInternalServerError)
 		return
 	}
 	err = json.NewEncoder(w).Encode(mods)
 	if err != nil {
-		fmt.Println("Error encoding list of mods to JSON:", err)
+		log.Print("Error encoding list of mods to JSON:", err)
 		http.Error(w, "Error encoding list of mods to JSON", http.StatusInternalServerError)
 		return
 	}
@@ -138,7 +141,7 @@ func getMods(w http.ResponseWriter, req *http.Request) {
 func addMod(w http.ResponseWriter, req *http.Request) {
 	err := req.ParseMultipartForm(100 << 20)
 	if err != nil {
-		fmt.Println("Error parsing file:", err)
+		log.Print("Error parsing file:", err)
 
 		http.Error(w, "Error parsing file", http.StatusBadRequest)
 		return
@@ -146,7 +149,7 @@ func addMod(w http.ResponseWriter, req *http.Request) {
 
 	file, handler, err := req.FormFile("file")
 	if err != nil {
-		fmt.Println("Error parsing file:", err)
+		log.Print("Error parsing file:", err)
 		http.Error(w, "Error parsing file", http.StatusBadRequest)
 		return
 
@@ -155,28 +158,28 @@ func addMod(w http.ResponseWriter, req *http.Request) {
 
 	dst, err := os.Create(BasePath + "/mods/" + handler.Filename)
 	if err != nil {
-		fmt.Println("Error creating file:", err)
+		log.Print("Error creating file:", err)
 		http.Error(w, "Error creating file", http.StatusInternalServerError)
 		return
 	}
 	defer dst.Close()
 
 	if _, err = io.Copy(dst, file); err != nil {
-		fmt.Println("Error saving file:", err)
+		log.Print("Error saving file:", err)
 		http.Error(w, "Error saving file", http.StatusInternalServerError)
 		return
 	}
 
 	modlist, err := getModFilenames()
 	if err != nil {
-		fmt.Println("Error getting list of mods:", err)
+		log.Print("Error getting list of mods:", err)
 		http.Error(w, "Error getting list of mods", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(modlist)
 	if err != nil {
-		fmt.Println("Error encoding list of mods to JSON:", err)
+		log.Print("Error encoding list of mods to JSON:", err)
 		http.Error(w, "Error encoding list of mods to JSON", http.StatusInternalServerError)
 		return
 	}
@@ -191,27 +194,27 @@ func deleteMod(w http.ResponseWriter, req *http.Request) {
 	var m mod
 	err := json.NewDecoder(req.Body).Decode(&m)
 	if err != nil {
-		fmt.Println("Error decoding JSON:", err)
+		log.Print("Error decoding JSON:", err)
 		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
 		return
 	}
 	err = os.Remove(BasePath + "/mods/" + m.Name)
 	if err != nil {
-		fmt.Println("Error deleting mod:", err)
+		log.Print("Error deleting mod:", err)
 		http.Error(w, "Error deleting mod", http.StatusInternalServerError)
 		return
 
 	}
 	modlist, err := getModFilenames()
 	if err != nil {
-		fmt.Println("Error getting list of mods:", err)
+		log.Print("Error getting list of mods:", err)
 		http.Error(w, "Error getting list of mods", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(modlist)
 	if err != nil {
-		fmt.Println("Error encoding list of mods to JSON:", err)
+		log.Print("Error encoding list of mods to JSON:", err)
 		http.Error(w, "Error encoding list of mods to JSON", http.StatusInternalServerError)
 		return
 	}
@@ -219,14 +222,15 @@ func deleteMod(w http.ResponseWriter, req *http.Request) {
 func main() {
 	fmt.Println("test")
 
+	http.HandleFunc("/time", getDifficulty)
 	http.HandleFunc("/properties", handleProperties)
 	http.HandleFunc("/mods", handleMods)
 
 	err := http.ListenAndServe(":8090", nil)
 	if errors.Is(err, http.ErrServerClosed) {
-		fmt.Printf("server closed\n")
+		log.Print("server closed\n")
 	} else if err != nil {
-		fmt.Printf("error starting server: %s\n", err)
+		log.Printf("error starting server: %s\n", err)
 		os.Exit(1)
 	}
 }
