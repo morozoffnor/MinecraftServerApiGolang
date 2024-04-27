@@ -254,6 +254,7 @@ func changeDifficulty(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
 		return
 	}
+	log.Print("Changing difficulty to:", c.Text)
 	response, err := changeDifficultyRCON(c.Text)
 	if err != nil {
 		log.Print("Error changing difficulty:", err)
@@ -271,8 +272,8 @@ func changeDifficulty(w http.ResponseWriter, r *http.Request) {
 
 func changeGamerule(w http.ResponseWriter, r *http.Request) {
 	type gamerule struct {
-		Rule  string
-		Value string
+		Rule  string `json:"rule"`
+		Value string `json:"value"`
 	}
 	var gr gamerule
 	err := json.NewDecoder(r.Body).Decode(&gr)
@@ -281,7 +282,9 @@ func changeGamerule(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
 		return
 	}
+	log.Print("Changing gamerule to:", gr.Rule, gr.Value)
 	response, err := changeGameruleRCON(gr.Rule, gr.Value)
+	log.Print("Response:", response)
 	if err != nil {
 		log.Print("Error changing gamerule:", err)
 		http.Error(w, "Error changing gamerule", http.StatusInternalServerError)
@@ -297,8 +300,65 @@ func changeGamerule(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func restartServer(w http.ResponseWriter, r *http.Request) {
+	response, err := stopServerRCON()
+	if err != nil {
+		log.Print("Error restarting server:", err)
+		http.Error(w, "Error restarting server", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(wrapRconResponse(response))
+	if err != nil {
+		log.Print("Error encoding to JSON:", err)
+		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
+		return
+	}
+}
+
+type serverInfo struct {
+	MinecraftVersion string
+	LoaderVersion    string
+}
+
+// TODO: Fix (sends nothing)
+func getServerInfo(w http.ResponseWriter, r *http.Request) {
+	var path = "/.fabric-manifest.json"
+	jsonFile, err := os.Open(BasePath + path)
+	if err != nil {
+		log.Print("Error reading server info:", err)
+		http.Error(w, "Error reading server info", http.StatusInternalServerError)
+		return
+	}
+	defer jsonFile.Close()
+
+	byteValue, _ := io.ReadAll(jsonFile)
+
+	var info map[string]string
+	err = json.Unmarshal([]byte(byteValue), &info)
+	if err != nil {
+		return
+	}
+	var si serverInfo
+	si.LoaderVersion = info["origin.loader"]
+	si.MinecraftVersion = info["origin.game"]
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(si)
+	if err != nil {
+		log.Print("Error encoding to JSON:", err)
+		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
+		return
+	}
+}
+
 func authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		//body, err := io.ReadAll(r.Body)
+		//if err != nil {
+		//	log.Print("Error reading request body:", err)
+		//
+		//}
+		//log.Print("Request body:", string(body))
 		log.Print("Auth middleware logic")
 		next.ServeHTTP(w, r)
 	})
@@ -315,6 +375,8 @@ func main() {
 	mux.Handle("POST /rcon/gamerule", authMiddleware(http.HandlerFunc(changeGamerule)))
 	mux.Handle("/properties", authMiddleware(http.HandlerFunc(handleProperties)))
 	mux.Handle("/mods", authMiddleware(http.HandlerFunc(handleMods)))
+	mux.Handle("POST /rcon/restart", authMiddleware(http.HandlerFunc(restartServer)))
+	mux.Handle("GET /info", authMiddleware(http.HandlerFunc(getServerInfo)))
 
 	err := http.ListenAndServe(":8090", mux)
 	if errors.Is(err, http.ErrServerClosed) {
@@ -322,12 +384,5 @@ func main() {
 	} else if err != nil {
 		log.Printf("error starting server: %s\n", err)
 		os.Exit(1)
-	}
-}
-
-func errorChecker(e error) {
-	if e != nil {
-		fmt.Println("An error occured: " + e.Error())
-		return
 	}
 }

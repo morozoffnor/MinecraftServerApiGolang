@@ -35,7 +35,7 @@ func stopServerRCON() (string, error) {
 func getDifficultyRCON() (string, error) {
 	response, err := sendRCONCommand("difficulty")
 	if err != nil {
-		log.Print("Error while getting the difficulty: ", err)
+		log.Print("Error while getting difficulty: ", err)
 		return "", err
 	}
 	return response, err
